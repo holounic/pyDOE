@@ -14,11 +14,10 @@ Abraham Lee.
 """
 
 import numpy as np
-from math import factorial
 
 __all__ = ['lhs']
 
-def lhs(n, samples=None, criterion=None, iterations=None):
+def lhs(n, samples=None, criterion=None, iterations=None, random_state=None):
     """
     Generate a latin-hypercube design
     
@@ -38,7 +37,10 @@ def lhs(n, samples=None, criterion=None, iterations=None):
     iterations : int
         The number of iterations in the maximin and correlations algorithms
         (Default: 5).
-    
+    random_state : integer or numpy.RandomState, optional
+        Random generator used for lhs generating. If an integer is given, it fixes the seed.
+        Defaults to the global numpy random number generator.
+
     Returns
     -------
     H : 2d-array
@@ -92,13 +94,18 @@ def lhs(n, samples=None, criterion=None, iterations=None):
     
     if samples is None:
         samples = n
+
+    if random_state is None:
+        random_state = np.random.RandomState()
+    elif isinstance(random_state, int):
+        random_state = np.random.RandomState(random_state)
     
     if criterion is not None:
         assert criterion.lower() in ('center', 'c', 'maximin', 'm', 
             'centermaximin', 'cm', 'correlation', 
             'corr'), 'Invalid value for "criterion": {}'.format(criterion)
     else:
-        H = _lhsclassic(n, samples)
+        H = _lhsclassic(n, samples, random_state)
 
     if criterion is None:
         criterion = 'center'
@@ -108,24 +115,24 @@ def lhs(n, samples=None, criterion=None, iterations=None):
         
     if H is None:
         if criterion.lower() in ('center', 'c'):
-            H = _lhscentered(n, samples)
+            H = _lhscentered(n, samples, random_state)
         elif criterion.lower() in ('maximin', 'm'):
-            H = _lhsmaximin(n, samples, iterations, 'maximin')
+            H = _lhsmaximin(n, samples, iterations, 'maximin', random_state)
         elif criterion.lower() in ('centermaximin', 'cm'):
-            H = _lhsmaximin(n, samples, iterations, 'centermaximin')
+            H = _lhsmaximin(n, samples, iterations, 'centermaximin', random_state)
         elif criterion.lower() in ('correlate', 'corr'):
-            H = _lhscorrelate(n, samples, iterations)
+            H = _lhscorrelate(n, samples, iterations, random_state)
     
     return H
 
 ################################################################################
 
-def _lhsclassic(n, samples):
+def _lhsclassic(n, samples, random_state):
     # Generate the intervals
     cut = np.linspace(0, 1, samples + 1)    
     
     # Fill points uniformly in each interval
-    u = np.random.rand(samples, n)
+    u = random_state.rand(samples, n)
     a = cut[:samples]
     b = cut[1:samples + 1]
     rdpoints = np.zeros_like(u)
@@ -135,19 +142,19 @@ def _lhsclassic(n, samples):
     # Make the random pairings
     H = np.zeros_like(rdpoints)
     for j in range(n):
-        order = np.random.permutation(range(samples))
+        order = random_state.permutation(range(samples))
         H[:, j] = rdpoints[order, j]
     
     return H
     
 ################################################################################
 
-def _lhscentered(n, samples):
+def _lhscentered(n, samples, random_state):
     # Generate the intervals
     cut = np.linspace(0, 1, samples + 1)    
     
     # Fill points uniformly in each interval
-    u = np.random.rand(samples, n)
+    u = random_state.rand(samples, n)
     a = cut[:samples]
     b = cut[1:samples + 1]
     _center = (a + b)/2
@@ -155,21 +162,21 @@ def _lhscentered(n, samples):
     # Make the random pairings
     H = np.zeros_like(u)
     for j in range(n):
-        H[:, j] = np.random.permutation(_center)
+        H[:, j] = random_state.permutation(_center)
     
     return H
     
 ################################################################################
 
-def _lhsmaximin(n, samples, iterations, lhstype):
+def _lhsmaximin(n, samples, iterations, lhstype, random_state):
     maxdist = 0
     
     # Maximize the minimum distance between points
     for i in range(iterations):
         if lhstype=='maximin':
-            Hcandidate = _lhsclassic(n, samples)
+            Hcandidate = _lhsclassic(n, samples, random_state)
         else:
-            Hcandidate = _lhscentered(n, samples)
+            Hcandidate = _lhscentered(n, samples, random_state)
         
         d = _pdist(Hcandidate)
         if maxdist<np.min(d):
@@ -180,13 +187,13 @@ def _lhsmaximin(n, samples, iterations, lhstype):
 
 ################################################################################
 
-def _lhscorrelate(n, samples, iterations):
+def _lhscorrelate(n, samples, iterations, random_state):
     mincorr = np.inf
     
     # Minimize the components correlation coefficients
     for i in range(iterations):
         # Generate a random LHS
-        Hcandidate = _lhsclassic(n, samples)
+        Hcandidate = _lhsclassic(n, samples, random_state)
         R = np.corrcoef(Hcandidate)
         if np.max(np.abs(R[R!=1]))<mincorr:
             mincorr = np.max(np.abs(R-np.eye(R.shape[0])))
