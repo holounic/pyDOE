@@ -37,7 +37,7 @@ def lhs(n, samples=None, criterion=None, iterations=None, random_state=None):
     iterations : int
         The number of iterations in the maximin and correlations algorithms
         (Default: 5).
-    random_state : integer or numpy.RandomState, optional
+    random_state : integer or numpy.RandomState
         Random generator used for lhs generating. If an integer is given, it fixes the seed.
         Defaults to the global numpy random number generator.
 
